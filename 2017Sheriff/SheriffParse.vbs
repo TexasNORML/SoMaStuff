@@ -1,7 +1,8 @@
 baseUrl = "http://www.sheriffstx.org/county_map/county/"
 start_idx = 2524
-end_idx = 2524 + 254
-
+end_idx = start_idx + 254
+' start_idx = 2524 + 24
+' end_idx = start_idx + 2
 
 Set objFSO=CreateObject("Scripting.FileSystemObject")
 
@@ -21,25 +22,33 @@ Do While start_idx < end_idx
 	oHTTP.setRequestHeader "Content-Length", Len(sRequest)
 	oHTTP.send sRequest
 	HTTPPost = oHTTP.responseText
+	' WScript.echo HTTPPost
 
-	' strip off top chunk
+	
+	' strip the data from the MIDdle of the page
 	top_tag = "ptitles"
-	top_tag2 = "</p>"
-	end_top_idx = InStr(HTTPPost,top_tag)
-	end_top_idx = InStr(end_top_idx, HTTPPost, top_tag2)
-	HTTPPost = Right(HTTPPost, len(HTTPPost)-end_top_idx+1)
+	tag_idx1 = InStr(HTTPPost,top_tag) + len(top_tag)
+	bottom_tag = "<!-- BANNERS -->"
+	tag_idx2 = InStr(HTTPPost,bottom_tag)
+	HTTPPost = Mid(HTTPPost, tag_idx1, tag_idx2 - tag_idx1)
+    ' trim a little more
+	top_tag = "<div><p>"
+	tag_idx1 = InStr(HTTPPost,top_tag) + len(top_tag)
+	HTTPPost = Mid(HTTPPost, tag_idx1, tag_idx2 - tag_idx1)
+
+	' get rid of the image
+	img_idx = InStr(HTTPPost, "<img")
+	If (img_idx > 0) Then
+	    img_end = InStr(HTTPPost, ">") + 1
+	    img_substr = Mid(HTTPPost, img_idx, img_end - img_idx)
+		HTTPPost = Replace(HTTPPost, img_substr, "")
+	End If
 	
-	' strip off bottom chunk
-	bottom_tag = " <!-- BANNERS -->"
-	end_btm_idx = InStr(HTTPPost,bottom_tag)
-    HTTPPost = Left(HTTPPost, end_btm_idx)
-	
-	'get rid of easy unwanted markup
+	' get rid of easy unwanted markup
 	HTTPPost = Replace(HTTPPost, "</p>", "")
 	HTTPPost = Replace(HTTPPost, "<p>", "")
 	HTTPPost = Replace(HTTPPost, "</a>", "")
 	HTTPPost = Replace(HTTPPost, "</div>", "")
-	' Not Working HTTPPost = Trim(HTTPPost)
 	
 	' Remove white space
 	HTTPPost = Replace(HTTPPost, vbCrLf, "")
@@ -50,15 +59,25 @@ Do While start_idx < end_idx
 	HTTPPost = Replace(HTTPPost, "<br />", ",")
 	
 	'  remove the anchor for the email
-	' estart = InStr(HTTPPost, "<")
-	' eend = InStrRev(HTTPPost, ">")
-	' ss_len = eend - eestart
-	'  substr = Mid(HTTPPost, estart, ss_len)
-	HTTPPost = Replace(HTTPPost, "<", ",")
-	HTTPPost = Replace(HTTPPost, ">", ",")
+	email_atag = "<a title=""Email"
+	email_idx = InStr(HTTPPost, email_atag)
+	If (email_idx > 0) Then
+	    email_end = InStr(HTTPPost, ">") + 1
+	    email_substr = Mid(HTTPPost, email_idx, email_end - email_idx)
+		HTTPPost = Replace(HTTPPost, email_substr, "")
+	End If
+	HTTPPost = Replace(HTTPPost, "Email: ", "")
+	HTTPPost = Replace(HTTPPost, "Email:", "")
 	
-  
-	WScript.Echo HTTPPost
+    ' add the index
+	first_char = Mid(HTTPPost,1,1)
+    If Asc(first_char) = 160 Or Asc(first_char) = 44 Then
+	    HTTPPost = Right(HTTPPost, len(HTTPPost)-1)
+	End If
+	' WScript.Echo Asc(first_char)
+	' WScript.Echo HTTPPost
+	
+	HTTPPost = start_idx & "," & HTTPPost
 	objFile.Write HTTPPost & vbCrLf
 	start_idx = start_idx + 1
 Loop
